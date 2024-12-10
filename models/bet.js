@@ -18,7 +18,6 @@ const betSchema = new Schema({
   colour: { type: String, enum: ["red", "black"] },
   quantity: {
     type: Number,
-    required: true,
     min: [50, "The amount of money bet will be greater than or equal to fifty"],
     max: [
       10000,

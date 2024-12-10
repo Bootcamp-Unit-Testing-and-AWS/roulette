@@ -29,10 +29,7 @@ async function updateRoulette(req, res) {
     if (!rouletteUpdate) {
       return res.status(404).json({ message: "Roulette no found" });
     }
-    // res.status(200).json({
-    //   message: "Status updated successfully",
-    //   employee: rouletteUpdate,
-    // });
+
     if (rouletteUpdate.status) {
       return res.status(200).json({ message: "Status activated" });
     } else {
@@ -42,80 +39,106 @@ async function updateRoulette(req, res) {
     res.status(500).json({ message: "Error when updating the status", error });
   }
 }
+
 async function closeRoulette(req, res) {
   try {
     const id = req.params.id;
-    //console.log(id);
     const updateStatus = req.body;
-    //console.log("false-->", updateStatus);
+
     if (!updateStatus.status) {
-      //console.log("ingreso a false");
+      // Actualizar el estado de la ruleta
       const rouletteUpdate = await Roulette.findByIdAndUpdate(
         id,
         updateStatus,
-        {
-          new: true,
-        }
+        { new: true }
       );
-      //console.log(rouletteUpdate);
       if (!rouletteUpdate) {
-        return res.status(404).json({ message: "Roulette no found" });
+        return res.status(404).json({ message: "Roulette not found" });
       }
 
-      const seekRouletteWithAllBets = await Bet.find().populate("roulette", [
-        "_id",
-      ]);
-
-      const filterWin = seekRouletteWithAllBets.map((bet) => {
-        const newArrayColour = {
-          identification_user: bet.identification_user,
-          colour: bet.colour,
-          quantity: bet.quantity,
-        };
-
-        if (bet.bet_number % 2 === 0 && bet.colour === "red") {
-          return newArrayColour;
-        } else {
-          return newArrayColour;
+      // Obtener todas las apuestas
+      const seekRouletteWithAllBets = await Bet.find({ roulette: id }).populate(
+        {
+          path: "roulette",
         }
-      });
+      );
+      console.log("seekk--->", seekRouletteWithAllBets);
+      // Generar un número aleatorio entre 0 y 36
+      const randomNumber = Math.floor(Math.random() * 37);
 
-      //console.log(filterWin);
+      // Filtrar y calcular premios por número (bet_number)
+      const payPrizesByNumber = seekRouletteWithAllBets
+        .map((bet) => {
+          // Si el número es par, el color debe ser rojo
+          // Si el número es impar, el color debe ser negro
+          if (bet.bet_number === randomNumber) {
+            return {
+              identification_user: bet.identification_user,
+              colour: bet.colour,
+              quantity: bet.quantity,
+            };
+          }
+          return `There is no winning number. Your number is: ${bet.bet_number} and the roulette number was: ${randomNumber}`; // Si no
+        })
+        .filter(Boolean);
 
-      //console.log("newArray-->", filterWin);
+      // Filtrar y calcular premios por color (rojo o negro)
+      const filterWin = seekRouletteWithAllBets
+        .map((bet) => {
+          // Si el número es par, el color debe ser rojo
+          // Si el número es impar, el color debe ser negro
+          if (
+            (bet.bet_number % 2 === 0 && bet.colour === "red") ||
+            (bet.bet_number % 2 === 1 && bet.colour === "black")
+          ) {
+            return {
+              identification_user: bet.identification_user,
+              colour: bet.colour,
+              quantity: bet.quantity,
+            };
+          }
+          return;
+        })
+        .filter(Boolean);
 
-      const winByColour = Math.round(Math.random(2));
+      //console.log("filtered by colour:", filterWin);
 
+      // Generar un número aleatorio para el color (0 para rojo, 1 para negro)
+      const winByColour = Math.random() < 0.5 ? 0 : 1; // 0 -> rojo, 1 -> negro
+
+      // Filtrar y calcular los premios por color
       const payPrizes = filterWin
         .map((payColour) => {
           const payWins = {
             identification_user: payColour.identification_user,
+            colour: payColour.colour,
             quantity: payColour.quantity * 1.8,
           };
 
-          if (winByColour === 0 && payColour.colour === "red") {
+          if (
+            (winByColour === 0 && payColour.colour === "red") ||
+            (winByColour === 1 && payColour.colour === "black")
+          ) {
             return payWins;
           }
-
-          if (winByColour === 1 && payColour.colour === "black") {
-            return payWins;
-          }
-
           return null;
         })
-        .filter(Boolean);
+        .filter(Boolean); //Elimina null
 
-      return res
-        .status(200)
-        .json({ message: "Roulette closed and winners paid", payPrizes });
+      return res.status(200).json({
+        message: "Roulette closed and winners paid",
+        byColors: payPrizes,
+        byNumbers: payPrizesByNumber,
+      });
     }
 
-    if (rouletteUpdate.status) {
-      return res.status(200).json({ message: "Status activated" });
-    } else {
-      return res.status(404).json({ message: "Status disabled" });
-    }
-  } catch (error) {}
+    return res.status(404).json({ message: "Status disabled" });
+  } catch (error) {
+    console.error("Error:", error);
+    return res
+      .status(500)
+      .json({ message: "Error when trying to close roulette", error });
+  }
 }
 
 export default {
