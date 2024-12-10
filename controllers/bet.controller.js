@@ -7,7 +7,7 @@ async function createBet(req, res) {
     const newBet = await Bet.create({
       identification_user,
       bet_number,
-      colour,
+      colour: colour.toLowerCase(),
       quantity,
       roulette,
     });
@@ -22,7 +22,21 @@ async function createBet(req, res) {
       .json({ message: "Error when trying to create the Roulette", error });
   }
 }
+async function getAllBets(req, res) {
+  try {
+    const getBets = await Bet.find().populate("roulette");
+    if (!getBets) {
+      return res.json({ message: "There are no bets created" });
+    }
+    return res.json({ bets: getBets });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error when trying to create the Roulette", error });
+  }
+}
 
 export default {
   createBet,
+  getAllBets,
 };
